@@ -5,6 +5,8 @@
     <Description>Avalonia update banner and view model for TomLabs.AutoUpdate.</Description>
     <PackageTags>autoupdate;updater;avalonia</PackageTags>
     <IsTrimmable>true</IsTrimmable>
+    <!-- Compiled bindings: the banner must keep working in trimmed apps, where reflection bindings lose their targets. -->
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
