@@ -118,6 +118,8 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      SIGNING_KEY: ${{ secrets.signing-key }}
 
     steps:
       - uses: actions/checkout@v4
@@ -149,9 +151,7 @@ jobs:
 
       # Detached signature: base64(DER ECDSA-SHA256) over the exact bytes of update.json.
       - name: Sign update.json
-        if: ${{ secrets.signing-key != '' }}
-        env:
-          SIGNING_KEY: ${{ secrets.signing-key }}
+        if: env.SIGNING_KEY != ''
         run: |
           printf '%s' "$SIGNING_KEY" > signing.pem
           openssl dgst -sha256 -sign signing.pem -out update.sig.der artifacts/update.json
