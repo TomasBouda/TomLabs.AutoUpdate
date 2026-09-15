@@ -4,11 +4,14 @@ using System.Text.Json;
 
 namespace TomLabs.AutoUpdate;
 
+/// <summary>A fetched manifest together with the exact bytes it was parsed from (what a signature covers).</summary>
+public sealed record UpdateFetchResult(UpdateManifest Manifest, byte[] RawJson, string? SignatureBase64);
+
 /// <summary>Where manifests come from. Implementations must be safe to call repeatedly and must not show UI.</summary>
 public interface IUpdateSource
 {
     /// <summary>Fetches the latest manifest for a channel; null when the channel has nothing published yet.</summary>
-    Task<UpdateManifest?> FetchAsync(UpdateChannel channel, HttpClient http, CancellationToken cancellationToken);
+    Task<UpdateFetchResult?> FetchAsync(UpdateChannel channel, HttpClient http, CancellationToken cancellationToken);
 
     /// <summary>Turns a manifest asset URL (absolute, relative or missing) into an absolute download URL.</summary>
     Uri ResolveAssetUrl(UpdateManifest manifest, UpdateAsset asset);
@@ -28,13 +31,16 @@ public sealed class GitHubReleasesSource : IUpdateSource
     public string NightlyTag { get; init; } = "nightly";
     public string ManifestAssetName { get; init; } = "update.json";
 
+    /// <summary>Detached signature asset (base64 DER ECDSA over the manifest bytes); optional unless the app requires signing.</summary>
+    public string SignatureAssetName => ManifestAssetName + ".sig";
+
     public GitHubReleasesSource(string owner, string repository)
     {
         Owner = owner;
         Repository = repository;
     }
 
-    public async Task<UpdateManifest?> FetchAsync(UpdateChannel channel, HttpClient http, CancellationToken cancellationToken)
+    public async Task<UpdateFetchResult?> FetchAsync(UpdateChannel channel, HttpClient http, CancellationToken cancellationToken)
     {
         var url = channel == UpdateChannel.Nightly
             ? $"https://api.github.com/repos/{Owner}/{Repository}/releases/tags/{NightlyTag}"
@@ -61,14 +67,18 @@ public sealed class GitHubReleasesSource : IUpdateSource
         if (!_assetUrls.TryGetValue(ManifestAssetName, out var manifestUrl))
             return null;
 
-        await using var manifestStream = await http.GetStreamAsync(manifestUrl, cancellationToken).ConfigureAwait(false);
-        var manifest = await JsonSerializer.DeserializeAsync(manifestStream, UpdateJsonContext.Default.UpdateManifest, cancellationToken).ConfigureAwait(false);
+        var raw = await http.GetByteArrayAsync(manifestUrl, cancellationToken).ConfigureAwait(false);
+        var manifest = JsonSerializer.Deserialize(raw, UpdateJsonContext.Default.UpdateManifest);
         if (manifest is null) return null;
+
+        string? signature = null;
+        if (_assetUrls.TryGetValue(SignatureAssetName, out var signatureUrl))
+            signature = (await http.GetStringAsync(signatureUrl, cancellationToken).ConfigureAwait(false)).Trim();
 
         manifest.NotesUrl ??= release.HtmlUrl;
         manifest.Notes ??= release.Body;
         manifest.PublishedAt ??= release.PublishedAt;
-        return manifest;
+        return new UpdateFetchResult(manifest, raw, signature);
     }
 
     public Uri ResolveAssetUrl(UpdateManifest manifest, UpdateAsset asset)
@@ -95,15 +105,24 @@ public sealed class ManifestSource : IUpdateSource
     /// <summary>Different manifest per channel, e.g. <c>channel => new Uri($"https://dl.example.com/app/{channel}/latest.json")</c>.</summary>
     public ManifestSource(Func<UpdateChannel, Uri> manifestUrl) => _manifestUrl = manifestUrl;
 
-    public async Task<UpdateManifest?> FetchAsync(UpdateChannel channel, HttpClient http, CancellationToken cancellationToken)
+    public async Task<UpdateFetchResult?> FetchAsync(UpdateChannel channel, HttpClient http, CancellationToken cancellationToken)
     {
         _lastUrl = _manifestUrl(channel);
         using var response = await http.GetAsync(_lastUrl, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return await JsonSerializer.DeserializeAsync(stream, UpdateJsonContext.Default.UpdateManifest, cancellationToken).ConfigureAwait(false);
+        var raw = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        var manifest = JsonSerializer.Deserialize(raw, UpdateJsonContext.Default.UpdateManifest);
+        if (manifest is null) return null;
+
+        // The detached signature sits next to the manifest: latest.json -> latest.json.sig
+        string? signature = null;
+        using var sigResponse = await http.GetAsync(new Uri(_lastUrl + ".sig"), cancellationToken).ConfigureAwait(false);
+        if (sigResponse.IsSuccessStatusCode)
+            signature = (await sigResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)).Trim();
+
+        return new UpdateFetchResult(manifest, raw, signature);
     }
 
     public Uri ResolveAssetUrl(UpdateManifest manifest, UpdateAsset asset)

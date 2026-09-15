@@ -35,6 +35,21 @@ public sealed class UpdateOptions
     /// <summary>Refuse assets without a SHA-256 in the manifest (default true).</summary>
     public bool RequireChecksum { get; set; } = true;
 
+    /// <summary>
+    /// ECDSA P-256 public key (PEM, "-----BEGIN PUBLIC KEY-----"). When set, a manifest is only accepted when
+    /// its detached signature (<c>update.json.sig</c>, base64 DER over the manifest bytes) verifies against it.
+    /// </summary>
+    public string? PublicKeyPem { get; set; }
+
+    /// <summary>
+    /// When the build that was just installed does not report a healthy start (see <see cref="Updater.MarkHealthy"/>)
+    /// the previous executable is restored on the next launch (default true).
+    /// </summary>
+    public bool RollbackOnFailedStart { get; set; } = true;
+
+    /// <summary>If the app never calls <see cref="Updater.MarkHealthy"/>, the start counts as healthy after this long.</summary>
+    public TimeSpan HealthyAfter { get; set; } = TimeSpan.FromSeconds(60);
+
     /// <summary>Override the build info (tests, or an app whose entry assembly is not the versioned one).</summary>
     public AppBuildInfo? Build { get; set; }
 

@@ -60,6 +60,28 @@ The workflow publishes `<App>-<rid>.zip` per RID plus `update.json`:
 The version must come from the build (`<VersionPrefix>` in the csproj; the workflow appends
 `-nightly.<sha>` for the nightly channel) — the updater reads `AssemblyInformationalVersion`.
 
+## Signed manifests (optional, recommended)
+
+Generate a key pair once (`openssl ecparam -name prime256v1 -genkey -noout -out private.pem`,
+`openssl ec -in private.pem -pubout -out public.pem`), store the private key as the `UPDATE_SIGNING_KEY`
+secret of each app repository and pass it to the workflow:
+
+```yaml
+    uses: TomasBouda/TomLabs.AutoUpdate/.github/workflows/publish-app.yml@master
+    with: { … }
+    secrets:
+      signing-key: ${{ secrets.UPDATE_SIGNING_KEY }}
+```
+
+Embed the public key in the app (`PublicKeyPem = "-----BEGIN PUBLIC KEY-----…"`) and every manifest must then
+carry a valid `update.json.sig`; a missing or tampered signature rejects the update.
+
+## Rollback
+
+The previous executable stays as `App.exe.old` until the new build reports a healthy start — call
+`Updater.Current?.MarkHealthy()` once the main window is up (or it is assumed after 60 s). If the new
+build dies before that, the next launch restores the previous version automatically.
+
 ## Requirements
 
 - The app runs from a writable folder (portable exe). Program Files without elevation is refused with a

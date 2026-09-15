@@ -46,6 +46,10 @@ on:
         required: false
         type: boolean
         default: true
+    secrets:
+      signing-key:
+        description: ECDSA P-256 private key (PEM). When set, update.json.sig is published and apps with the matching public key verify it.
+        required: false
 
 permissions:
   contents: write
@@ -143,6 +147,18 @@ jobs:
           Get-Content artifacts/update.json
           "version=$version" >> $env:GITHUB_OUTPUT
 
+      # Detached signature: base64(DER ECDSA-SHA256) over the exact bytes of update.json.
+      - name: Sign update.json
+        if: env.SIGNING_KEY != ''
+        env:
+          SIGNING_KEY: ${{ secrets.signing-key }}
+        run: |
+          printf '%s' "$SIGNING_KEY" > signing.pem
+          openssl dgst -sha256 -sign signing.pem -out update.sig.der artifacts/update.json
+          base64 -w0 update.sig.der > artifacts/update.json.sig
+          rm -f signing.pem update.sig.der
+          echo "Signed update.json"
+
       - name: Move nightly tag
         if: inputs.channel == 'nightly'
         run: |
@@ -165,6 +181,7 @@ jobs:
           files: |
             artifacts/*.zip
             artifacts/update.json
+            artifacts/update.json.sig
 
       - name: Publish release
         if: inputs.channel == 'stable'
@@ -175,3 +192,4 @@ jobs:
           files: |
             artifacts/*.zip
             artifacts/update.json
+            artifacts/update.json.sig

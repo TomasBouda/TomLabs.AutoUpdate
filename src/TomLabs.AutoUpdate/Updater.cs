@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 
 namespace TomLabs.AutoUpdate;
 
@@ -30,6 +31,11 @@ public sealed class Updater : IDisposable
 
     /// <summary>Why in-place updating is unavailable on this machine (read-only folder, dotnet run, …), or null.</summary>
     public string? DisabledReason { get; private set; }
+
+    /// <summary>True when this launch restored the previous executable because the updated build failed to start.</summary>
+    public bool RolledBack { get; private set; }
+
+    private bool _healthy;
 
     public UpdateChannel Channel
     {
@@ -76,14 +82,72 @@ public sealed class Updater : IDisposable
         {
             updater.Log($"In-place update unavailable: {updater.DisabledReason}");
             updater.SetState(UpdateState.Disabled);
-        }
-        else
-        {
-            updater.SetState(UpdateState.Idle);
-            _ = updater.RunBackgroundAsync();
+            return updater;
         }
 
+        if (updater.TryRollbackFailedStart())
+            return updater;
+
+        updater.SetState(UpdateState.Idle);
+        _ = updater.RunBackgroundAsync();
         return updater;
+    }
+
+    /// <summary>
+    /// Call once the app is usable (main window shown): removes the previous executable kept as rollback.
+    /// Without the call the start is treated as healthy after <see cref="UpdateOptions.HealthyAfter"/>.
+    /// </summary>
+    public void MarkHealthy()
+    {
+        if (_healthy) return;
+        _healthy = true;
+        TryDelete(StartMarkerPath);
+        _ = UpdateApplier.CleanUpAsync(Build.ExecutablePath, _lifetime.Token);
+    }
+
+    private string StartMarkerPath => Path.Combine(DownloadDirectory, "starting.marker");
+
+    /// <summary>
+    /// A marker is written while a freshly updated build starts and removed by <see cref="MarkHealthy"/>.
+    /// Finding it at the next launch means the previous start never got that far: restore the backup and relaunch.
+    /// </summary>
+    private bool TryRollbackFailedStart()
+    {
+        try
+        {
+            var hasBackup = UpdateApplier.HasBackup(Build.ExecutablePath);
+            if (!hasBackup)
+            {
+                TryDelete(StartMarkerPath);
+                return false;
+            }
+
+            if (File.Exists(StartMarkerPath) && _options.RollbackOnFailedStart)
+            {
+                Log("The previous start of this build did not complete; restoring the previous version.");
+                TryDelete(StartMarkerPath);
+                UpdateApplier.Rollback(Build.ExecutablePath);
+                RolledBack = true;
+                var start = new System.Diagnostics.ProcessStartInfo(Build.ExecutablePath) { UseShellExecute = true };
+                System.Diagnostics.Process.Start(start);
+                (_options.ExitApplication ?? (() => Environment.Exit(0)))();
+                return true;
+            }
+
+            Directory.CreateDirectory(DownloadDirectory);
+            File.WriteAllText(StartMarkerPath, Build.Version.ToString());
+            _ = Task.Delay(_options.HealthyAfter, _lifetime.Token).ContinueWith(_ => MarkHealthy(), TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+        catch (Exception ex)
+        {
+            Log($"Rollback guard failed: {ex.Message}");
+        }
+        return false;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort */ }
     }
 
     private async Task RunBackgroundAsync()
@@ -91,7 +155,6 @@ public sealed class Updater : IDisposable
         var token = _lifetime.Token;
         try
         {
-            await UpdateApplier.CleanUpAsync(Build.ExecutablePath, token).ConfigureAwait(false);
             UpdateDownloader.Prune(DownloadDirectory, keepVersion: null);
 
             if (_options.CheckOnStartup)
@@ -122,10 +185,13 @@ public sealed class Updater : IDisposable
         try
         {
             SetState(UpdateState.Checking);
-            var manifest = await _options.Source.FetchAsync(_channel, _http, cancellationToken).ConfigureAwait(false);
+            var fetched = await _options.Source.FetchAsync(_channel, _http, cancellationToken).ConfigureAwait(false);
             LastCheck = DateTimeOffset.Now;
 
-            var update = manifest is null ? null : Evaluate(manifest);
+            if (fetched != null && _options.PublicKeyPem != null)
+                VerifySignature(fetched);
+
+            var update = fetched is null ? null : Evaluate(fetched.Manifest);
             if (update is null)
             {
                 Available = null;
@@ -183,6 +249,19 @@ public sealed class Updater : IDisposable
         var url = _options.Source.ResolveAssetUrl(manifest, asset);
         return new UpdateInfo(version, manifest.Commit, manifest.PublishedAt, manifest.Notes, manifest.NotesUrl,
             url.ToString(), asset.File, asset.Sha256, asset.Size, asset.Executable);
+    }
+
+    /// <summary>ECDSA P-256 / SHA-256 over the exact manifest bytes; any mismatch rejects the manifest.</summary>
+    private void VerifySignature(UpdateFetchResult fetched)
+    {
+        if (string.IsNullOrWhiteSpace(fetched.SignatureBase64))
+            throw new InvalidOperationException("The manifest is not signed and this app requires signed updates.");
+
+        using var ecdsa = ECDsa.Create();
+        ecdsa.ImportFromPem(_options.PublicKeyPem);
+        var signature = Convert.FromBase64String(fetched.SignatureBase64);
+        if (!ecdsa.VerifyData(fetched.RawJson, signature, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence))
+            throw new InvalidOperationException("The manifest signature is invalid.");
     }
 
     private static bool SameCommit(string? a, string? b)
