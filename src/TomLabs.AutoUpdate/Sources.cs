@@ -57,8 +57,9 @@ public sealed class GitHubReleasesSource : IUpdateSource
                 _assetUrls[asset.Name] = asset.BrowserDownloadUrl;
         }
 
+        // A release published without the manifest (older tooling, manual upload) is not something we can install from.
         if (!_assetUrls.TryGetValue(ManifestAssetName, out var manifestUrl))
-            throw new InvalidOperationException($"Release '{release.TagName}' has no {ManifestAssetName} asset.");
+            return null;
 
         await using var manifestStream = await http.GetStreamAsync(manifestUrl, cancellationToken).ConfigureAwait(false);
         var manifest = await JsonSerializer.DeserializeAsync(manifestStream, UpdateJsonContext.Default.UpdateManifest, cancellationToken).ConfigureAwait(false);

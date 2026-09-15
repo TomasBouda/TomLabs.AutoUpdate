@@ -260,11 +260,18 @@ public sealed class Updater : IDisposable
         Raise();
     }
 
+    private readonly object _raiseLock = new();
+
     private void Raise()
     {
         if (_context != null)
+        {
             _context.Post(_ => StateChanged?.Invoke(this, EventArgs.Empty), null);
-        else
+            return;
+        }
+
+        // No UI thread (console, tests): keep handlers from running concurrently.
+        lock (_raiseLock)
             StateChanged?.Invoke(this, EventArgs.Empty);
     }
 

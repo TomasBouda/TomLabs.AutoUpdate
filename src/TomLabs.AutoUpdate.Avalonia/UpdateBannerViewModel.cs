@@ -28,7 +28,9 @@ public sealed class UpdateBannerViewModel : INotifyPropertyChanged, IDisposable
 
     public UpdateState State => _updater?.State ?? UpdateState.Disabled;
 
-    public bool IsVisible => State is UpdateState.Available or UpdateState.Downloading or UpdateState.ReadyToInstall or UpdateState.Failed;
+    /// <summary>Shown while an update is in play; a failed check (offline, rate limit) stays silent.</summary>
+    public bool IsVisible => State is UpdateState.Available or UpdateState.Downloading or UpdateState.ReadyToInstall
+                             || (State == UpdateState.Failed && _updater?.Available != null);
 
     public bool IsBusy => State is UpdateState.Checking or UpdateState.Downloading;
 
