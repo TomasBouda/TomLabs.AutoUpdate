@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>TomLabs.AutoUpdate</RootNamespace>
+    <Description>Self-update for portable .NET desktop apps: checks GitHub Releases or a JSON manifest, verifies SHA-256, swaps the running exe and restarts.</Description>
+    <PackageTags>autoupdate;updater;desktop;github-releases</PackageTags>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

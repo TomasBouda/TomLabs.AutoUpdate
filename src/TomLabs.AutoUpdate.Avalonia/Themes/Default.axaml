@@ -1,0 +1,39 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Default colours of the update banner. Include this file in Application.Styles and override any key
+        in Application.Resources (or per theme variant) to match the app's palette.
+    -->
+    <Styles.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="UpdateBannerBackground" Color="#0D000000"/>
+                    <SolidColorBrush x:Key="UpdateBannerBorder" Color="#26000000"/>
+                    <SolidColorBrush x:Key="UpdateBannerForeground" Color="#5C5F6B"/>
+                    <SolidColorBrush x:Key="UpdateBannerAccent" Color="#B07F00"/>
+                    <SolidColorBrush x:Key="UpdateBannerAccentSoft" Color="#1AB07F00"/>
+                    <SolidColorBrush x:Key="UpdateBannerError" Color="#DC2626"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="UpdateBannerBackground" Color="#0AFFFFFF"/>
+                    <SolidColorBrush x:Key="UpdateBannerBorder" Color="#26FFFFFF"/>
+                    <SolidColorBrush x:Key="UpdateBannerForeground" Color="#9A9CA6"/>
+                    <SolidColorBrush x:Key="UpdateBannerAccent" Color="#F5B400"/>
+                    <SolidColorBrush x:Key="UpdateBannerAccentSoft" Color="#1AF5B400"/>
+                    <SolidColorBrush x:Key="UpdateBannerError" Color="#F87171"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Styles.Resources>
+
+    <Style Selector="Border.update-banner.failed">
+        <Setter Property="BorderBrush" Value="{DynamicResource UpdateBannerError}"/>
+    </Style>
+    <Style Selector="Border.update-banner.failed TextBlock.update-banner">
+        <Setter Property="Foreground" Value="{DynamicResource UpdateBannerError}"/>
+    </Style>
+    <Style Selector="Border.update-banner.ready">
+        <Setter Property="BorderBrush" Value="{DynamicResource UpdateBannerAccent}"/>
+    </Style>
+</Styles>

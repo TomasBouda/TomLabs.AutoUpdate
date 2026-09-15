@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:TomLabs.AutoUpdate.Avalonia"
+             x:Class="TomLabs.AutoUpdate.Avalonia.UpdateBanner"
+             x:DataType="local:UpdateBannerViewModel"
+             IsVisible="{Binding IsVisible}">
+    <!--
+        Compact banner meant for a header or status bar: "v1.2.0 available · [Update]".
+        Colours come from the UpdateBanner* resources in Themes/Default.axaml; override them in Application.Resources.
+    -->
+    <Border Classes="update-banner"
+            Classes.failed="{Binding IsFailed}"
+            Classes.ready="{Binding IsReady}"
+            Background="{DynamicResource UpdateBannerBackground}"
+            BorderBrush="{DynamicResource UpdateBannerBorder}"
+            BorderThickness="1" CornerRadius="5" Padding="8,3">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <ProgressBar Classes="update-banner" IsVisible="{Binding IsDownloading}"
+                         Minimum="0" Maximum="100" Value="{Binding ProgressPercent}"
+                         Width="80" Height="4" Foreground="{DynamicResource UpdateBannerAccent}"
+                         Background="{DynamicResource UpdateBannerBorder}" VerticalAlignment="Center"/>
+            <TextBlock Classes="update-banner" Text="{Binding Message}" FontSize="11"
+                       Foreground="{DynamicResource UpdateBannerForeground}" VerticalAlignment="Center"
+                       ToolTip.Tip="{Binding Notes}"/>
+            <Button Classes="update-banner" Content="{Binding PrimaryLabel}" Command="{Binding PrimaryCommand}"
+                    IsVisible="{Binding !IsDownloading}"
+                    FontSize="11" FontWeight="Medium" Padding="8,2" MinHeight="0" CornerRadius="4"
+                    Background="{DynamicResource UpdateBannerAccentSoft}" BorderBrush="{DynamicResource UpdateBannerAccent}"
+                    BorderThickness="1" Foreground="{DynamicResource UpdateBannerAccent}"/>
+            <Button Classes="update-banner notes" Content="Notes" Command="{Binding OpenNotesCommand}"
+                    IsVisible="{Binding !IsDownloading}"
+                    FontSize="11" Padding="6,2" MinHeight="0" CornerRadius="4" Background="Transparent"
+                    BorderThickness="0" Foreground="{DynamicResource UpdateBannerForeground}"/>
+        </StackPanel>
+    </Border>
+</UserControl>

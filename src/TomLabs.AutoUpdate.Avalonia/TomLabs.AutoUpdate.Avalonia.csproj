@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>TomLabs.AutoUpdate.Avalonia</RootNamespace>
+    <Description>Avalonia update banner and view model for TomLabs.AutoUpdate.</Description>
+    <PackageTags>autoupdate;updater;avalonia</PackageTags>
+    <IsTrimmable>true</IsTrimmable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.18" />
+    <ProjectReference Include="..\TomLabs.AutoUpdate\TomLabs.AutoUpdate.csproj" />
+  </ItemGroup>
+</Project>

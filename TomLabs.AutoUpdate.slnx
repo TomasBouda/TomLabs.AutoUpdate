@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TomLabs.AutoUpdate.Avalonia/TomLabs.AutoUpdate.Avalonia.csproj" />
+    <Project Path="src/TomLabs.AutoUpdate/TomLabs.AutoUpdate.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TomLabs.AutoUpdate.Tests/TomLabs.AutoUpdate.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,177 @@
+name: Publish desktop app
+
+# Reusable workflow for portable Avalonia/.NET desktop apps that update through TomLabs.AutoUpdate.
+# Builds one self-contained single-file exe per RID, zips it, writes update.json (version, commit,
+# SHA-256 per asset) and publishes everything as a GitHub release:
+#   channel: nightly -> moves the rolling pre-release tag and updates that pre-release
+#   channel: stable  -> creates/updates the release for the tag that triggered the caller
+#
+# Caller example (nightly on every push to master):
+#   jobs:
+#     nightly:
+#       uses: TomasBouda/TomLabs.AutoUpdate/.github/workflows/publish-app.yml@main
+#       with: { project: src/App/App.csproj, app-name: App, channel: nightly }
+#       secrets: inherit
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Path to the csproj to publish
+        required: true
+        type: string
+      app-name:
+        description: Application name; zip files are named <app-name>-<rid>.zip and must match UpdateOptions.AppName
+        required: true
+        type: string
+      channel:
+        description: stable or nightly
+        required: true
+        type: string
+      rids:
+        description: JSON array of runtime identifiers
+        required: false
+        type: string
+        default: '["win-x64", "win-arm64"]'
+      nightly-tag:
+        required: false
+        type: string
+        default: nightly
+      dotnet-version:
+        required: false
+        type: string
+        default: '9.0.x'
+      submodules:
+        description: Check out submodules (true when the app references the library as a submodule)
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        rid: ${{ fromJson(inputs.rids) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: ${{ inputs.submodules }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Version suffix
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ inputs.channel }}" = "nightly" ]; then
+            echo "suffix=-p:VersionSuffix=nightly.${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        run: dotnet publish "${{ inputs.project }}" -c Release -r ${{ matrix.rid }} ${{ steps.ver.outputs.suffix }} -o publish/${{ matrix.rid }}
+
+      - name: Zip and describe asset
+        shell: pwsh
+        run: |
+          $rid = "${{ matrix.rid }}"
+          $app = "${{ inputs.app-name }}"
+          $exe = Get-ChildItem "publish/$rid/*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No executable found in publish/$rid" }
+          $zip = "$app-$rid.zip"
+          Compress-Archive -Path "publish/$rid/*" -DestinationPath $zip -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $product = $exe.VersionInfo.ProductVersion
+          $version = ($product -split '\+')[0]
+          $fragment = @{
+            version = $version
+            rid = $rid
+            file = $zip
+            sha256 = $hash
+            size = (Get-Item $zip).Length
+            executable = $exe.Name
+          }
+          $fragment | ConvertTo-Json | Set-Content "asset-$rid.json"
+          Write-Host "Built $version for $rid -> $zip ($hash)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-${{ matrix.rid }}
+          path: |
+            ${{ inputs.app-name }}-${{ matrix.rid }}.zip
+            asset-${{ matrix.rid }}.json
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Write update.json
+        id: manifest
+        shell: pwsh
+        run: |
+          $fragments = Get-ChildItem artifacts/asset-*.json | ForEach-Object { Get-Content $_ -Raw | ConvertFrom-Json }
+          $version = $fragments[0].version
+          $manifest = [ordered]@{
+            name = "${{ inputs.app-name }}"
+            version = $version
+            commit = "${{ github.sha }}"
+            channel = "${{ inputs.channel }}"
+            publishedAt = (Get-Date).ToUniversalTime().ToString("o")
+            notesUrl = "https://github.com/${{ github.repository }}/releases/tag/" + $(if ("${{ inputs.channel }}" -eq "nightly") { "${{ inputs.nightly-tag }}" } else { "${{ github.ref_name }}" })
+            assets = @($fragments | ForEach-Object { [ordered]@{ rid = $_.rid; file = $_.file; sha256 = $_.sha256; size = $_.size; executable = $_.executable } })
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content artifacts/update.json
+          Get-Content artifacts/update.json
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Move nightly tag
+        if: inputs.channel == 'nightly'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "${{ inputs.nightly-tag }}"
+          git push -f origin "${{ inputs.nightly-tag }}"
+
+      - name: Publish nightly pre-release
+        if: inputs.channel == 'nightly'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.nightly-tag }}
+          name: Nightly build
+          prerelease: true
+          body: |
+            Continuous build `${{ steps.manifest.outputs.version }}` of `${{ github.ref_name }}` at ${{ github.sha }}.
+
+            ${{ github.event.head_commit.message }}
+          files: |
+            artifacts/*.zip
+            artifacts/update.json
+
+      - name: Publish release
+        if: inputs.channel == 'stable'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.zip
+            artifacts/update.json

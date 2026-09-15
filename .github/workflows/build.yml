@@ -1,0 +1,24 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet test -c Release
+      - run: dotnet pack src/TomLabs.AutoUpdate -c Release -o nupkg --no-build
+      - run: dotnet pack src/TomLabs.AutoUpdate.Avalonia -c Release -o nupkg --no-build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: nupkg/*.nupkg
