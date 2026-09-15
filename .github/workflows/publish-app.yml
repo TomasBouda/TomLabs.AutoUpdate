@@ -149,7 +149,7 @@ jobs:
 
       # Detached signature: base64(DER ECDSA-SHA256) over the exact bytes of update.json.
       - name: Sign update.json
-        if: env.SIGNING_KEY != ''
+        if: ${{ secrets.signing-key != '' }}
         env:
           SIGNING_KEY: ${{ secrets.signing-key }}
         run: |
