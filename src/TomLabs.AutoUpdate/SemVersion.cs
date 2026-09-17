@@ -17,6 +17,9 @@ public sealed class SemVersion : IComparable<SemVersion>, IEquatable<SemVersion>
 
     public bool IsPrerelease => Prerelease != null;
 
+    /// <summary>The version without pre-release label and metadata (<c>1.2.0-nightly.abc</c> → <c>1.2.0</c>).</summary>
+    public SemVersion Core => new(Major, Minor, Patch);
+
     public SemVersion(int major, int minor, int patch, string? prerelease = null, string? buildMetadata = null)
     {
         Major = major;

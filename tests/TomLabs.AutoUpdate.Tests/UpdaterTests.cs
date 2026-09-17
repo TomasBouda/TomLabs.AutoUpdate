@@ -89,6 +89,27 @@ public class UpdaterTests
     }
 
     [Fact]
+    public async Task NightlyIgnoresTheLexicalOrderOfCommitHashes()
+    {
+        var exe = Path.Combine(Path.GetTempPath(), $"TestApp-{Guid.NewGuid():N}.exe");
+        File.WriteAllText(exe, "x");
+        try
+        {
+            // "cd78e82" sorts after "564dca3" as a string, yet 564dca3 is the newer build.
+            var source = new FakeSource { Manifest = Manifest("0.6.1-nightly.564dca3", "564dca3371f7") };
+            var options = Options(source, "0.6.1-nightly.cd78e82", "cd78e82aaaaa", UpdateChannel.Nightly);
+            options.Build = new AppBuildInfo(SemVersion.Parse("0.6.1-nightly.cd78e82"), "cd78e82aaaaa", exe);
+            using var u = Updater.Start(options);
+            Assert.True(await u.CheckAsync());
+            Assert.Equal("0.6.1-nightly.564dca3", u.Available!.Version.ToString());
+        }
+        finally
+        {
+            File.Delete(exe);
+        }
+    }
+
+    [Fact]
     public async Task ManifestForAnotherAppIsIgnored()
     {
         var exe = Path.Combine(Path.GetTempPath(), $"TestApp-{Guid.NewGuid():N}.exe");

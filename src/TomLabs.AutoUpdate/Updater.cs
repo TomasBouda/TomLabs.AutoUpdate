@@ -232,9 +232,11 @@ public sealed class Updater : IDisposable
             return null;
         }
 
+        // Nightly labels carry a commit hash, which has no order: compare the core version only and treat a
+        // different commit of the same version as the newer build (the rolling pre-release is always the latest).
         var newer = _channel == UpdateChannel.Nightly
-            // Nightly builds of the same version differ only by commit; a different commit is a newer build.
-            ? version > Build.Version || (version.Equals(Build.Version) && !SameCommit(manifest.Commit, Build.Commit))
+            ? version.Core > Build.Version.Core
+              || (version.Core.Equals(Build.Version.Core) && !string.IsNullOrEmpty(manifest.Commit) && !SameCommit(manifest.Commit, Build.Commit))
             : version > Build.Version;
         if (!newer) return null;
 

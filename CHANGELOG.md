@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-09-17
+
+- Fixed: on the nightly channel a build whose commit hash sorted lexically lower than the running one was never offered; nightly now compares the core version and treats any other commit as newer.
+
 ## 0.2.0 — 2026-09-15
 
 - Added: optional ECDSA P-256 manifest signatures (`update.json.sig`, `UpdateOptions.PublicKeyPem`, `signing-key` secret of the publish workflow).

@@ -5,7 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Authors>Tomas Bouda</Authors>
     <Company>TomLabs</Company>
-    <VersionPrefix>0.2.0</VersionPrefix>
+    <VersionPrefix>0.2.1</VersionPrefix>
     <RepositoryUrl>https://github.com/TomasBouda/TomLabs.AutoUpdate</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/TomasBouda/TomLabs.AutoUpdate</PackageProjectUrl>
