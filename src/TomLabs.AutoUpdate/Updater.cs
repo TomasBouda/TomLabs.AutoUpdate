@@ -65,6 +65,8 @@ public sealed class Updater : IDisposable
         var agent = options.UserAgent ?? $"{options.AppName}/{Build.Version} TomLabs.AutoUpdate";
         _http.DefaultRequestHeaders.UserAgent.ParseAdd(agent);
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        if (!string.IsNullOrEmpty(options.AccessToken))
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.AccessToken);
     }
 
     /// <summary>

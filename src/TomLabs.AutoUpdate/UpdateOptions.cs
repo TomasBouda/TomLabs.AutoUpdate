@@ -65,6 +65,12 @@ public sealed class UpdateOptions
     /// <summary>Diagnostics sink; hook it to the app's logger.</summary>
     public Action<string>? Log { get; set; }
 
+    /// <summary>
+    /// Sent as <c>Authorization: Bearer …</c> with every manifest and download request. A private app on the TomLabs
+    /// app store needs one of the store's download tokens here; on GitHub a fine-grained token reads a private repo.
+    /// </summary>
+    public string? AccessToken { get; set; }
+
     /// <summary>Sent as the User-Agent (GitHub requires one); defaults to "{AppName}/{version} TomLabs.AutoUpdate".</summary>
     public string? UserAgent { get; set; }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-09-17
+
+- Added: `UpdateOptions.AccessToken`, sent as `Authorization: Bearer` with every manifest and download request — what a private app on the TomLabs app store needs (one of the store's download tokens), and enough for GitHub Releases of a private repository.
+
 ## 0.2.1 — 2026-09-17
 
 - Fixed: on the nightly channel a build whose commit hash sorted lexically lower than the running one was never offered; nightly now compares the core version and treats any other commit as newer.

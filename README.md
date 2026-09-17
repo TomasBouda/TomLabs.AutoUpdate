@@ -76,6 +76,13 @@ secret of each app repository and pass it to the workflow:
 Embed the public key in the app (`PublicKeyPem = "-----BEGIN PUBLIC KEY-----…"`) and every manifest must then
 carry a valid `update.json.sig`; a missing or tampered signature rejects the update.
 
+## Private feeds
+
+`UpdateOptions.AccessToken` is sent as `Authorization: Bearer …` with every manifest and download
+request. A private app on the TomLabs app store (`"private": true` in its `appstore.json`) answers 404
+to anonymous requests, so its updater needs one of the store's download tokens here; on GitHub a
+fine-grained token with `contents: read` reaches the releases of a private repository the same way.
+
 ## Rollback
 
 The previous executable stays as `App.exe.old` until the new build reports a healthy start — call
