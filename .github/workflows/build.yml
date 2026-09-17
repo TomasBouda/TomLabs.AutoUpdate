@@ -15,7 +15,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - run: dotnet test -c Release
+      - run: dotnet build -c Release
+      - run: dotnet test -c Release --no-build
       - run: dotnet pack src/TomLabs.AutoUpdate -c Release -o nupkg --no-build
       - run: dotnet pack src/TomLabs.AutoUpdate.Avalonia -c Release -o nupkg --no-build
       - uses: actions/upload-artifact@v4
