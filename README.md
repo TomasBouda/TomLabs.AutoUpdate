@@ -60,25 +60,6 @@ The workflow publishes `<App>-<rid>.zip` per RID plus `update.json`:
 The version must come from the build (`<VersionPrefix>` in the csproj; the workflow appends
 `-nightly.<sha>` for the nightly channel) — the updater reads `AssemblyInformationalVersion`.
 
-### Also publish to the TomLabs app store
-
-A GitHub-hosted app can be listed on https://apps.tomlabs.cz as well: pass `store-url` and the store's upload
-token, and the release job PUTs the very same zips, `update.json` and `update.json.sig` (plus `icon.png`,
-README, CHANGELOG and `appstore.json` from the repository root) to `/api/apps/<App>/<channel>`.
-
-```yaml
-    with:
-      project: src/App/App.csproj
-      app-name: App
-      channel: nightly
-      store-url: https://apps.tomlabs.cz
-    secrets:
-      signing-key: ${{ secrets.UPDATE_SIGNING_KEY }}
-      store-token: ${{ secrets.APPSTORE_TOKEN }}
-```
-
-The manifest is signed once, so the same public key in the app covers both feeds.
-
 ## Signed manifests (optional, recommended)
 
 Generate a key pair once (`openssl ecparam -name prime256v1 -genkey -noout -out private.pem`,
