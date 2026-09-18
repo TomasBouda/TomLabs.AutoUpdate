@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 — 2026-09-18
+
+- Added: the publish workflow can upload the same release to the TomLabs app store (`store-url` input, `store-token` secret).
+
 ## 0.2.2 — 2026-09-18
 
 - Changed: the manifest signature is verified only for a build that is newer than the running one, so an older unsigned release no longer reports an error.

@@ -46,9 +46,22 @@ on:
         required: false
         type: boolean
         default: true
+      store-url:
+        description: TomLabs app store to publish the same release to (e.g. https://apps.tomlabs.cz); empty = GitHub Releases only
+        required: false
+        type: string
+        default: ''
+      store-icon:
+        description: PNG icon sent to the app store catalogue (relative to the repository root)
+        required: false
+        type: string
+        default: icon.png
     secrets:
       signing-key:
         description: ECDSA P-256 private key (PEM). When set, update.json.sig is published and apps with the matching public key verify it.
+        required: false
+      store-token:
+        description: Bearer token accepted by the app store for uploads (its UploadTokens / AppTokens); required when store-url is set
         required: false
 
 permissions:
@@ -120,6 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SIGNING_KEY: ${{ secrets.signing-key }}
+      STORE_TOKEN: ${{ secrets.store-token }}
 
     steps:
       - uses: actions/checkout@v4
@@ -158,6 +172,27 @@ jobs:
           base64 -w0 update.sig.der > artifacts/update.json.sig
           rm -f signing.pem update.sig.der
           echo "Signed update.json"
+
+      # The same release (zips, manifest and signature) also goes to the TomLabs app store catalogue.
+      - name: Upload to app store
+        if: inputs.store-url != ''
+        env:
+          STORE_URL: ${{ inputs.store-url }}
+          APP_NAME: ${{ inputs.app-name }}
+          CHANNEL: ${{ inputs.channel }}
+          ICON: ${{ inputs.store-icon }}
+        run: |
+          if [ -z "$STORE_TOKEN" ]; then echo "::error::store-url is set but the store-token secret is empty"; exit 1; fi
+          args=(-F "manifest=@artifacts/update.json")
+          [ -f artifacts/update.json.sig ] && args+=(-F "signature=@artifacts/update.json.sig")
+          for zip in artifacts/*.zip; do args+=(-F "$(basename "$zip")=@$zip"); done
+          [ -f "$ICON" ] && args+=(-F "icon=@$ICON")
+          [ -f README.md ] && args+=(-F "readme=@README.md")
+          [ -f CHANGELOG.md ] && args+=(-F "changelog=@CHANGELOG.md")
+          [ -f appstore.json ] && args+=(-F "app=@appstore.json")
+          url="${STORE_URL%/}/api/apps/$APP_NAME/$CHANNEL"
+          echo "PUT $url"
+          curl -fsS -X PUT "$url" -H "Authorization: Bearer $STORE_TOKEN" "${args[@]}"
 
       - name: Move nightly tag
         if: inputs.channel == 'nightly'
