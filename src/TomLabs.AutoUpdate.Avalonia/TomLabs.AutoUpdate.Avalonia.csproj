@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>TomLabs.AutoUpdate.Avalonia</RootNamespace>
     <Description>Avalonia update banner and view model for TomLabs.AutoUpdate.</Description>
     <PackageTags>autoupdate;updater;avalonia</PackageTags>
