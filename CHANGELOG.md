@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-09-18
+
+- Changed: the manifest signature is verified only for a build that is newer than the running one, so an older unsigned release no longer reports an error.
+
 ## 0.2.2 — 2026-09-17
 
 - Added: `UpdateOptions.AccessToken`, sent as `Authorization: Bearer` with every manifest and download request — what a private app on the TomLabs app store needs (one of the store's download tokens), and enough for GitHub Releases of a private repository.

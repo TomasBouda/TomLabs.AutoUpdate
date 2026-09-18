@@ -190,9 +190,6 @@ public sealed class Updater : IDisposable
             var fetched = await _options.Source.FetchAsync(_channel, _http, cancellationToken).ConfigureAwait(false);
             LastCheck = DateTimeOffset.Now;
 
-            if (fetched != null && _options.PublicKeyPem != null)
-                VerifySignature(fetched);
-
             var update = fetched is null ? null : Evaluate(fetched.Manifest);
             if (update is null)
             {
@@ -200,6 +197,10 @@ public sealed class Updater : IDisposable
                 SetState(UpdateState.UpToDate);
                 return false;
             }
+
+            // Only a build we would actually install needs a valid signature; an older unsigned release is simply not an update.
+            if (_options.PublicKeyPem != null)
+                VerifySignature(fetched!);
 
             Available = update;
             Log($"Update available: {update.Version} ({update.ShortCommit})");
