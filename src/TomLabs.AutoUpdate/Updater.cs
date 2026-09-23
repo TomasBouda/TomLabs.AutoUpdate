@@ -290,8 +290,31 @@ public sealed class Updater : IDisposable
             SetState(UpdateState.Downloading);
             var progress = new Progress<double>(p => { Progress = p; Raise(); });
             var exeName = Path.GetFileName(Build.ExecutablePath);
-            _downloadedExecutable = await UpdateDownloader.DownloadAsync(update, DownloadDirectory, exeName,
-                _options.RequireChecksum, _http, progress, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                _downloadedExecutable = await UpdateDownloader.DownloadAsync(update, DownloadDirectory, exeName,
+                    _options.RequireChecksum, _http, progress, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ChecksumMismatchException ex)
+            {
+                // The asset url belongs to the channel, not to one version (…/dl/App/stable/App-win-x64.zip), so a
+                // release published between reading the manifest and downloading it serves different bytes. Read the
+                // manifest again and take whatever is current now; a mismatch on the same version is a real failure.
+                Log($"{ex.Message} Re-reading the manifest in case a newer build was published meanwhile.");
+                var fetched = await _options.Source.FetchAsync(_channel, _http, cancellationToken).ConfigureAwait(false);
+                var refreshed = fetched is null ? null : Evaluate(fetched.Manifest);
+                if (refreshed is null || refreshed.Version == update.Version)
+                    throw;
+
+                if (_options.PublicKeyPem != null)
+                    VerifySignature(fetched!);
+
+                Log($"The manifest now offers {refreshed.Version}; downloading that instead.");
+                update = refreshed;
+                Available = refreshed;
+                _downloadedExecutable = await UpdateDownloader.DownloadAsync(update, DownloadDirectory, exeName,
+                    _options.RequireChecksum, _http, progress, cancellationToken).ConfigureAwait(false);
+            }
             UpdateDownloader.Prune(DownloadDirectory, keepVersion: update.Version.ToString());
             Progress = 1;
             SetState(UpdateState.ReadyToInstall);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-09-23
+
+- Changed: the library, the update banner and the tests target .NET 10.
+- Fixed: a release published while an app was downloading the previous one failed with "Downloaded file failed the SHA-256 check" and only a restart recovered. Asset urls belong to the channel rather than to a version, so the updater now re-reads the manifest on a checksum mismatch and installs the build that is current; a mismatch on the same version is still reported as a failure.
+
 ## 0.2.2 — 2026-09-18
 
 - Changed: the manifest signature is verified only for a build that is newer than the running one, so an older unsigned release no longer reports an error.

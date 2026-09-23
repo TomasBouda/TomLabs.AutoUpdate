@@ -47,7 +47,7 @@ internal static class UpdateDownloader
         if (!string.IsNullOrEmpty(update.Sha256) && !await HashMatchesAsync(archivePath, update.Sha256, cancellationToken).ConfigureAwait(false))
         {
             File.Delete(archivePath);
-            throw new InvalidOperationException("Downloaded file failed the SHA-256 check.");
+            throw new ChecksumMismatchException(update.Version.ToString());
         }
 
         if (archivePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
@@ -94,4 +94,20 @@ internal static class UpdateDownloader
             // Housekeeping only.
         }
     }
+}
+
+/// <summary>
+/// The downloaded asset is not the one the manifest described. Asset urls are per channel, not per version
+/// (<c>…/dl/App/stable/App-win-x64.zip</c>), so this is what a release landing between reading the manifest and
+/// downloading the asset looks like; the updater re-reads the manifest and tries once more.
+/// </summary>
+public sealed class ChecksumMismatchException : Exception
+{
+    public ChecksumMismatchException(string version)
+        : base($"Downloaded file failed the SHA-256 check (expected the asset of {version}).")
+    {
+        Version = version;
+    }
+
+    public string Version { get; }
 }
