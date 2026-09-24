@@ -13,6 +13,13 @@ Self-update for portable .NET desktop apps — no installer, no helper process.
 
 ## Use in an app
 
+Both packages are on nuget.org:
+
+```xml
+<PackageReference Include="TomLabs.AutoUpdate.Avalonia" Version="0.3.2" />  <!-- banner + library -->
+<PackageReference Include="TomLabs.AutoUpdate" Version="0.3.2" />           <!-- library only, no UI -->
+```
+
 ```csharp
 // App.axaml.cs, OnFrameworkInitializationCompleted
 Updater.Start(new UpdateOptions("IISBlitz", new GitHubReleasesSource("TomasBouda", "IISBlitz"))
@@ -40,7 +47,7 @@ Override `UpdateBannerBackground`, `UpdateBannerBorder`, `UpdateBannerForeground
 ```yaml
 jobs:
   nightly:
-    uses: TomasBouda/TomLabs.AutoUpdate/.github/workflows/publish-app.yml@main
+    uses: TomasBouda/TomLabs.AutoUpdate/.github/workflows/publish-app.yml@master
     with:
       project: src/App/App.csproj
       app-name: App          # must equal UpdateOptions.AppName
@@ -93,4 +100,4 @@ build dies before that, the next launch restores the previous version automatica
 
 - The app runs from a writable folder (portable exe). Program Files without elevation is refused with a
   clear reason; the banner then stays hidden.
-- .NET 8 or newer, trimming-safe (System.Text.Json source generation).
+- .NET 10, trimming-safe (System.Text.Json source generation); the banner needs Avalonia 11.3.18 or newer.

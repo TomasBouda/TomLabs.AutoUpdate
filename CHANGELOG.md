@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 — 2026-09-24
+
+- Added: both packages are published to nuget.org (`TomLabs.AutoUpdate`, `TomLabs.AutoUpdate.Avalonia`) with icon and README; apps reference them as a `PackageReference` instead of a git submodule. A `v*` tag publishes through nuget.org Trusted Publishing.
+
 ## 0.3.1 — 2026-09-24
 
 - Fixed: "updates off: Another instance of the application is running; close it first." stayed for the rest of the session. Whether an update can be applied is now decided again before every check instead of once at startup, so the state clears as soon as the other instance is gone; while that is the only thing in the way, the updater looks again every 30 seconds rather than at the next interval.

@@ -5,12 +5,18 @@
     <LangVersion>latest</LangVersion>
     <Authors>Tomas Bouda</Authors>
     <Company>TomLabs</Company>
-    <VersionPrefix>0.3.1</VersionPrefix>
+    <VersionPrefix>0.3.2</VersionPrefix>
     <RepositoryUrl>https://github.com/TomasBouda/TomLabs.AutoUpdate</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/TomasBouda/TomLabs.AutoUpdate</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <!-- Apps publish the library as a project reference; keep their output to the exe alone. -->
+    <!-- Apps ship as one exe; no pdb next to it from the library. -->
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 </Project>
