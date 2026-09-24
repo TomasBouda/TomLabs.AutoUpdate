@@ -13,6 +13,12 @@ public static class UpdateApplier
     public const string BackupSuffix = ".old";
     public const string UpdatedArgument = "--updated";
 
+    /// <summary>
+    /// The one blocking reason that routinely clears itself without the user doing anything: right after an update
+    /// the replaced build is still exiting while its successor already runs. Callers retry sooner on this one.
+    /// </summary>
+    public const string OtherInstanceReason = "Another instance of the application is running; close it first.";
+
     /// <summary>Explains why an update cannot be applied in place, or null when it can.</summary>
     public static string? CheckCanApply(string executablePath)
     {
@@ -33,8 +39,8 @@ public static class UpdateApplier
             return $"The application folder is not writable: {directory}";
         }
 
-        if (OtherInstanceRunning(executablePath))
-            return "Another instance of the application is running; close it first.";
+        if (IsOtherInstanceRunning(executablePath))
+            return OtherInstanceReason;
 
         return null;
     }
@@ -110,7 +116,8 @@ public static class UpdateApplier
         File.Delete(broken);
     }
 
-    private static bool OtherInstanceRunning(string executablePath)
+    /// <summary>True when another process runs the very same executable file (the previous build during an update handover).</summary>
+    public static bool IsOtherInstanceRunning(string executablePath)
     {
         try
         {

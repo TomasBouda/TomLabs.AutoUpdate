@@ -37,6 +37,11 @@ public sealed class Updater : IDisposable
 
     private bool _healthy;
 
+    /// <summary>How soon the updater looks again while the only thing in its way is another instance that is exiting.</summary>
+    private static readonly TimeSpan OtherInstanceRetryInterval = TimeSpan.FromSeconds(30);
+
+    private bool _disabledUntilTheOtherInstanceExits;
+
     public UpdateChannel Channel
     {
         get => _channel;
@@ -79,20 +84,54 @@ public sealed class Updater : IDisposable
         Current = updater;
         updater.Log($"Build {updater.Build.Version} ({updater.Build.ShortCommit ?? "no commit"}), channel {updater._channel}, exe {updater.Build.ExecutablePath}");
 
-        updater.DisabledReason = UpdateApplier.CheckCanApply(updater.Build.ExecutablePath);
-        if (updater.DisabledReason != null)
-        {
-            updater.Log($"In-place update unavailable: {updater.DisabledReason}");
-            updater.SetState(UpdateState.Disabled);
-            return updater;
-        }
+        // A build that has just replaced its predecessor starts while the old process is still exiting, so the
+        // "another instance is running" guard would fire on every single update. Leave the verdict to the first
+        // check, by which time the handover is over.
+        if (updater.WasJustUpdated && UpdateApplier.IsOtherInstanceRunning(updater.Build.ExecutablePath))
+            updater.Log("Started by an update while the previous instance is still exiting; deciding at the first check.");
+        else
+            updater.RefreshAvailability();
 
         if (updater.TryRollbackFailedStart())
             return updater;
 
-        updater.SetState(UpdateState.Idle);
+        if (updater.State != UpdateState.Disabled)
+            updater.SetState(UpdateState.Idle);
         _ = updater.RunBackgroundAsync();
         return updater;
+    }
+
+    /// <summary>True when this process was launched by <see cref="UpdateApplier.Apply"/> to replace the previous build.</summary>
+    public bool WasJustUpdated { get; } =
+        Array.Exists(Environment.GetCommandLineArgs(), a => a.Equals(UpdateApplier.UpdatedArgument, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Asks whether an update could be applied right now and moves in and out of <see cref="UpdateState.Disabled"/>
+    /// accordingly. Every reason can go away while the app runs — another instance closes, a folder becomes
+    /// writable — so the verdict is never latched: it is taken again before every check.
+    /// </summary>
+    private bool RefreshAvailability()
+    {
+        var reason = UpdateApplier.CheckCanApply(Build.ExecutablePath);
+        if (reason != null)
+        {
+            if (reason != DisabledReason)
+                Log($"In-place update unavailable: {reason}");
+            DisabledReason = reason;
+            _disabledUntilTheOtherInstanceExits = reason == UpdateApplier.OtherInstanceReason;
+            if (State != UpdateState.Disabled)
+                SetState(UpdateState.Disabled);
+            return false;
+        }
+
+        if (DisabledReason != null || State == UpdateState.Disabled)
+        {
+            Log("In-place update is possible again.");
+            DisabledReason = null;
+            _disabledUntilTheOtherInstanceExits = false;
+            SetState(UpdateState.Idle);
+        }
+        return true;
     }
 
     /// <summary>
@@ -167,7 +206,11 @@ public sealed class Updater : IDisposable
 
             while (_options.CheckInterval > TimeSpan.Zero)
             {
-                await Task.Delay(_options.CheckInterval, token).ConfigureAwait(false);
+                // An instance that is only waiting for its predecessor to exit looks again in seconds, not hours.
+                var wait = _disabledUntilTheOtherInstanceExits && OtherInstanceRetryInterval < _options.CheckInterval
+                    ? OtherInstanceRetryInterval
+                    : _options.CheckInterval;
+                await Task.Delay(wait, token).ConfigureAwait(false);
                 if (State is UpdateState.ReadyToInstall or UpdateState.Downloading) continue;
                 await CheckAsync(token).ConfigureAwait(false);
             }
@@ -181,7 +224,9 @@ public sealed class Updater : IDisposable
     /// <summary>Looks for a newer build on the current channel. Never throws; failures land in <see cref="Error"/>.</summary>
     public async Task<bool> CheckAsync(CancellationToken cancellationToken = default)
     {
-        if (State == UpdateState.Disabled) return false;
+        // Taken again every time: what blocked an update a minute ago (another instance still exiting after an
+        // update) is usually gone by now, and the app must not stay "updates off" for the rest of its life.
+        if (!RefreshAvailability()) return false;
         if (!await _gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return Available != null;
 
         try

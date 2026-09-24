@@ -129,6 +129,67 @@ public class UpdaterTests
             File.Delete(exe);
         }
     }
+
+    /// <summary>
+    /// An instance started by an update runs for a moment next to the build it replaced, which used to disable
+    /// its updater for the rest of the session — the "updates off" message stayed on screen long after the old
+    /// process was gone. The verdict has to be taken again at every check.
+    /// </summary>
+    [Fact]
+    public async Task AnotherInstanceDisablesUpdatesOnlyWhileItRuns()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        using var other = SecondInstance.Start(out var exe);
+        try
+        {
+            Assert.Equal(UpdateApplier.OtherInstanceReason, UpdateApplier.CheckCanApply(exe));
+
+            var source = new FakeSource { Manifest = Manifest("9.0.0") };
+            var options = Options(source, "0.5.0");
+            options.Build = new AppBuildInfo(SemVersion.Parse("0.5.0"), null, exe);
+            using var updater = Updater.Start(options);
+
+            Assert.Equal(UpdateState.Disabled, updater.State);
+            Assert.Equal(UpdateApplier.OtherInstanceReason, updater.DisabledReason);
+            Assert.False(await updater.CheckAsync());
+
+            other.Kill(entireProcessTree: true);
+            other.WaitForExit();
+
+            Assert.True(await updater.CheckAsync());
+            Assert.Equal(UpdateState.Available, updater.State);
+            Assert.Null(updater.DisabledReason);
+        }
+        finally
+        {
+            if (!other.HasExited) other.Kill(entireProcessTree: true);
+            try { File.Delete(exe); } catch (IOException) { /* still locked; the temp folder keeps it */ }
+        }
+    }
+}
+
+/// <summary>A real second process running the very same executable file, which is what the guard looks for.</summary>
+internal static class SecondInstance
+{
+    public static System.Diagnostics.Process Start(out string executablePath)
+    {
+        // A copy of cmd.exe is an executable the test can start and kill; its process name is the copy's file name.
+        executablePath = Path.Combine(Path.GetTempPath(), $"TestApp-{Guid.NewGuid():N}.exe");
+        File.Copy(Path.Combine(Environment.SystemDirectory, "cmd.exe"), executablePath);
+        var start = new System.Diagnostics.ProcessStartInfo(executablePath, "/c ping -n 30 127.0.0.1")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+        };
+        var process = System.Diagnostics.Process.Start(start)!;
+        // Process.GetProcessesByName only finds it once it is up.
+        for (var i = 0; i < 50 && !UpdateApplier.IsOtherInstanceRunning(executablePath); i++)
+            Thread.Sleep(100);
+        return process;
+    }
 }
 
 public class SignatureTests

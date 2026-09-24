@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 2026-09-24
+
+- Fixed: "updates off: Another instance of the application is running; close it first." stayed for the rest of the session. Whether an update can be applied is now decided again before every check instead of once at startup, so the state clears as soon as the other instance is gone; while that is the only thing in the way, the updater looks again every 30 seconds rather than at the next interval.
+- Fixed: a build started by an update reported that message at all — it runs for a moment next to the build it replaced, so the verdict now waits for the first check.
+- Fixed: an app that started while another instance was running skipped the rollback guard, so a failed update was never rolled back and the `.exe.old` backup stayed behind.
+
 ## 0.3.0 — 2026-09-23
 
 - Changed: the library, the update banner and the tests target .NET 10.
